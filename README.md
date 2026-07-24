@@ -117,11 +117,13 @@ smoke image complete in follow-on work; this Dockerfile is the sealed entrypoint
 
 | Pin | Value |
 | --- | --- |
-| Dataset | `HuggingFaceFW/fineweb-edu` (revision tightened with loader impl) |
-| Global token start offset | `0` (documented; shared by all arches) |
-| Prod `token_budget` | `2_500_000_000` |
-| Epochs / pass | `1` (single-pass) |
-| Smoke override | `PRISM_RECIPE_TOKEN_BUDGET` |
+| Dataset | `HuggingFaceFW/fineweb-edu` |
+| Revision (immutable commit) | `87f09149ef4734204d70ed1d046ddc9ca3f2b8f9` |
+| `EQUAL_OFFSET` (global token start) | `0` (documented; shared by all arches) |
+| `TOKEN_BUDGET_PROD` | `2_500_000_000` |
+| Epochs / pass | `1` (single-pass; multi-epoch rescan forbidden) |
+| Smoke override | `PRISM_RECIPE_TOKEN_BUDGET` (budget only; offset identity unchanged) |
+| Master FineWeb mount | **Not required** — workers load HF / cached shards themselves |
 | Default OpenRouter model | `openai/gpt-4.1-mini` (gate client lands later) |
 | Rules tree | `.rules/*.md` (immutable in image) |
 
@@ -130,8 +132,8 @@ smoke image complete in follow-on work; this Dockerfile is the sealed entrypoint
 ```text
 prism-recipe/
   .rules/                 # training compliance (LLM gate input)
-  src/prism_recipe/       # package: config, loader stub, gate stub, harness, cli
-  tests/                  # unit / scaffold tests
+  src/prism_recipe/       # package: config, loader, gate stub, harness, cli
+  tests/                  # unit / scaffold / loader tests
   docs/                   # miner + architecture + security
   Dockerfile              # image placeholder (digest pin later)
   pyproject.toml
@@ -140,10 +142,11 @@ prism-recipe/
 
 ## Status
 
-Scaffold ships package layout, rules, Dockerfile placeholder, and stub loader / gate APIs.
-Full FineWeb loader, OpenRouter client, CUDA image, and live dual-Lium score path are
-implemented in follow-on commits. Production 2.5B train is a **config pin**, not a required
-live long GPU run for engineering smoke.
+Scaffold plus **egalitarian FineWeb-Edu loader** (fixed revision pin, `EQUAL_OFFSET`,
+`TOKEN_BUDGET_PROD=2_500_000_000`, single-pass, smoke budget override, mocked-stream unit
+tests). OpenRouter client, CUDA image, and live dual-Lium score path land in follow-on
+commits. Production 2.5B train is a **config pin**, not a required live long GPU run for
+engineering smoke.
 
 ## License
 

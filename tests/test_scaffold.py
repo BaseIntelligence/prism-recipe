@@ -6,7 +6,13 @@ import os
 from pathlib import Path
 
 from prism_recipe import __version__
-from prism_recipe.config import PROD_TOKEN_BUDGET, prod_data_window, resolve_token_budget
+from prism_recipe.config import (
+    EQUAL_OFFSET,
+    PROD_TOKEN_BUDGET,
+    TOKEN_BUDGET_PROD,
+    prod_data_window,
+    resolve_token_budget,
+)
 from prism_recipe.llm_gate import rules_digest, run_rules_gate
 from prism_recipe.loader import build_loader
 
@@ -21,8 +27,12 @@ def test_prod_token_budget_pin() -> None:
     pin = prod_data_window()
     assert pin.token_budget == 2_500_000_000
     assert pin.token_budget == PROD_TOKEN_BUDGET
+    assert pin.token_budget == TOKEN_BUDGET_PROD
     assert pin.epochs == 1
     assert pin.token_start_offset == 0
+    assert pin.token_start_offset == EQUAL_OFFSET
+    assert pin.dataset_revision != "main"
+    assert len(pin.dataset_revision) == 40
 
 
 def test_smoke_budget_env_override(monkeypatch: object) -> None:
@@ -31,15 +41,15 @@ def test_smoke_budget_env_override(monkeypatch: object) -> None:
     plan = build_loader().plan()
     assert plan.token_budget == 1_000_000
     assert plan.pin.token_start_offset == 0  # identity unchanged
+    assert plan.single_pass is True
 
 
-def test_loader_stub_raises() -> None:
+def test_loader_plan_single_pass() -> None:
     loader = build_loader()
-    try:
-        next(loader.iter_tokens())
-        raise AssertionError("expected NotImplementedError")
-    except NotImplementedError:
-        pass
+    plan = loader.plan()
+    assert plan.single_pass is True
+    assert plan.epochs == 1
+    assert plan.as_dict()["master_fineweb_mount_required"] is False
 
 
 def test_rules_digest_stable() -> None:

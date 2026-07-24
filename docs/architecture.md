@@ -37,7 +37,7 @@ flowchart TB
 | Module | Role |
 | --- | --- |
 | `prism_recipe.config` | Prod pins + smoke budget resolve |
-| `prism_recipe.loader` | Egalitarian FineWeb loader (stub → full impl later) |
+| `prism_recipe.loader` | Egalitarian FineWeb loader (offset + budget, single-pass) |
 | `prism_recipe.llm_gate` | Rules digest + gate result shape (OpenRouter later) |
 | `prism_recipe.harness` | Preflight / train orchestration stubs |
 | `prism_recipe.cli` | `preflight`, `train`, `rules-digest` |
@@ -45,13 +45,29 @@ flowchart TB
 ## Data window identity
 
 Pin identity is `(dataset_id, dataset_revision, token_start_offset)`. Production sets
-`token_budget=2_500_000_000` and `epochs=1`. Smoke may lower budget only.
+`TOKEN_BUDGET_PROD = token_budget = 2_500_000_000` and `epochs = 1` (single-pass).
+Smoke may lower budget only via `PRISM_RECIPE_TOKEN_BUDGET`.
+
+| Constant | Value | Notes |
+| --- | --- | --- |
+| `PROD_DATASET_ID` | `HuggingFaceFW/fineweb-edu` | Same for all arches |
+| `PROD_DATASET_REVISION` | `87f09149ef4734204d70ed1d046ddc9ca3f2b8f9` | Immutable commit SHA (not a moving tag) |
+| `EQUAL_OFFSET` / `PROD_TOKEN_START_OFFSET` | `0` | Global token start; identical for every architecture |
+| `TOKEN_BUDGET_PROD` | `2_500_000_000` | Prod pin only; long 2.5B GPU train not required for smoke |
+| `PROD_EPOCHS` | `1` | Single-pass; multi-epoch rescan is rejected |
+
+### Worker data plane (no master FineWeb mount)
+
+Workers load FineWeb-Edu (or HF/local caches) **themselves** through the recipe loader.
+A live master FineWeb filesystem mount is **not** required for this product path. Unit
+tests inject a mocked/tiny document stream to prove offset + budget stop without network.
 
 ## Trust boundaries
 
 - **In image:** harness, rules, architecture/training for this product, loader code.
 - **Miner env:** `OPENROUTER_API_KEY`, Lium API key on the **host**, wallet/hotkey ops.
 - **Out of band:** chain API (`chain.joinbase.ai`), OpenRouter, Hugging Face hubs/caches.
+- **Not required:** master-hosted `/data/fineweb-edu` mount for recipe workers.
 
 ## Related BASE surfaces
 

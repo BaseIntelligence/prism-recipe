@@ -46,17 +46,14 @@ def preflight() -> RunOutcome:
     plan = loader.plan()
     gate = run_rules_gate()
     meta = {
-        "data_window": {
-            "dataset_id": pin.dataset_id,
-            "dataset_revision": pin.dataset_revision,
-            "token_start_offset": pin.token_start_offset,
-            "token_budget": plan.token_budget,
-            "epochs": pin.epochs,
-            "single_pass": plan.single_pass,
-        },
+        "data_window": plan.as_dict(),
         "prod_token_budget_pin": 2_500_000_000,
+        "token_budget_prod": 2_500_000_000,
+        "equal_offset": pin.token_start_offset,
         "smoke_budget_env": "PRISM_RECIPE_TOKEN_BUDGET",
         "resolved_budget": resolve_token_budget(),
+        "master_fineweb_mount_required": False,
+        "workers_load_hf_themselves": True,
     }
     if not gate.ok:
         return RunOutcome(

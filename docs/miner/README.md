@@ -37,15 +37,23 @@ pods when finished.
 
 ## Egalitarian data
 
-All architectures share:
+All architectures share the same window (no per-arch offsets):
 
-- FineWeb-Edu dataset pin / revision
-- Fixed global token start offset
-- Production budget **2_500_000_000** tokens
-- Single pass (one epoch)
+| Pin | Value |
+| --- | --- |
+| Dataset | `HuggingFaceFW/fineweb-edu` |
+| Revision (commit) | `87f09149ef4734204d70ed1d046ddc9ca3f2b8f9` |
+| `EQUAL_OFFSET` (global token start) | `0` |
+| `TOKEN_BUDGET_PROD` | `2_500_000_000` |
+| Epochs | `1` (single-pass; no multi-epoch rescan) |
+| Smoke override | `PRISM_RECIPE_TOKEN_BUDGET` (budget only) |
 
-Long 2.5B GPU runs are a production pin; engineering smoke uses tiny models and a small
-`PRISM_RECIPE_TOKEN_BUDGET`.
+Long 2.5B GPU runs are a **production config pin**, not a required live long train for
+engineering smoke. Smoke uses tiny models and a small `PRISM_RECIPE_TOKEN_BUDGET`.
+
+**Master FineWeb mount is not required.** Recipe workers stream HF FineWeb-Edu (or use
+a local HF cache) themselves inside the image. Do not depend on a master path such as
+`/data/fineweb-edu` being bind-mounted for this product.
 
 ## LLM gate
 
