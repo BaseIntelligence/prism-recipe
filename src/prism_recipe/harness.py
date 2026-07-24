@@ -73,9 +73,15 @@ def preflight() -> RunOutcome:
 
 
 def run_train() -> RunOutcome:
-    """Full train path (not implemented in scaffold)."""
+    """Full train path.
+
+    LLM rules gate **must** run first via preflight. When the gate returns
+    ``ok:false``, train does not start and the structured gate + attestation
+    metadata are returned for the worker result / ExecutionProof path.
+    """
     outcome = preflight()
     if not outcome.ok:
+        # Gate (or earlier stage) blocked train — never start train on reject.
         return outcome
     return RunOutcome(
         ok=False,

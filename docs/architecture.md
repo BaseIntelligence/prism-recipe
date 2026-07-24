@@ -38,7 +38,7 @@ flowchart TB
 | --- | --- |
 | `prism_recipe.config` | Prod pins + smoke budget resolve |
 | `prism_recipe.loader` | Egalitarian FineWeb loader (offset + budget, single-pass) |
-| `prism_recipe.llm_gate` | Rules digest + gate result shape (OpenRouter later) |
+| `prism_recipe.llm_gate` | OpenRouter rules gate + attestation metadata |
 | `prism_recipe.harness` | Preflight / train orchestration stubs |
 | `prism_recipe.cli` | `preflight`, `train`, `rules-digest` |
 

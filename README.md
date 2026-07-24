@@ -124,16 +124,17 @@ smoke image complete in follow-on work; this Dockerfile is the sealed entrypoint
 | Epochs / pass | `1` (single-pass; multi-epoch rescan forbidden) |
 | Smoke override | `PRISM_RECIPE_TOKEN_BUDGET` (budget only; offset identity unchanged) |
 | Master FineWeb mount | **Not required** — workers load HF / cached shards themselves |
-| Default OpenRouter model | `openai/gpt-4.1-mini` (gate client lands later) |
+| Default OpenRouter model | `openai/gpt-4.1-mini` (pinned request model) |
 | Rules tree | `.rules/*.md` (immutable in image) |
+| Gate attestation | `rules_digest`, `model`, `decision`, `checked_at`, `prompt_hash` |
 
 ## Repository layout
 
 ```text
 prism-recipe/
   .rules/                 # training compliance (LLM gate input)
-  src/prism_recipe/       # package: config, loader, gate stub, harness, cli
-  tests/                  # unit / scaffold / loader tests
+  src/prism_recipe/       # package: config, loader, llm_gate, harness, cli
+  tests/                  # unit / scaffold / loader / gate tests
   docs/                   # miner + architecture + security
   Dockerfile              # image placeholder (digest pin later)
   pyproject.toml
@@ -142,11 +143,11 @@ prism-recipe/
 
 ## Status
 
-Scaffold plus **egalitarian FineWeb-Edu loader** (fixed revision pin, `EQUAL_OFFSET`,
-`TOKEN_BUDGET_PROD=2_500_000_000`, single-pass, smoke budget override, mocked-stream unit
-tests). OpenRouter client, CUDA image, and live dual-Lium score path land in follow-on
-commits. Production 2.5B train is a **config pin**, not a required live long GPU run for
-engineering smoke.
+Scaffold plus **egalitarian FineWeb-Edu loader** and **pre-train OpenRouter LLM rules gate**
+(mocked unit tests; structured fail for missing key / reject; attestation metadata on
+worker results). CUDA image, tiny-1m smoke train, and live dual-Lium score path land in
+follow-on commits. Production 2.5B train is a **config pin**, not a required live long GPU
+run for engineering smoke.
 
 ## License
 

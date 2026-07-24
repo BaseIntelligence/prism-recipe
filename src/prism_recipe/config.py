@@ -48,9 +48,16 @@ PROD_DATASET_SPLIT = "train"
 # Env override for smoke / unit tests (does not change offset pin identity).
 SMOKE_TOKEN_BUDGET_ENV = "PRISM_RECIPE_TOKEN_BUDGET"
 
-# OpenRouter gate (stub pin; LLM client implemented in a later feature).
+# OpenRouter pre-train rules gate pins (VAL-RECIPE-003 / VAL-RECIPE-004).
+# Model is request-pinned; miners supply OPENROUTER_API_KEY only (never bake keys).
 DEFAULT_OPENROUTER_MODEL = "openai/gpt-4.1-mini"
 OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_CHAT_URL = OPENROUTER_API_URL
+OPENROUTER_HTTP_TIMEOUT_SECONDS = 120.0
+# Bound architecture/training source size embedded in the gate prompt.
+OPENROUTER_MAX_SOURCE_CHARS = 48_000
+OPENROUTER_PROMPT_VERSION = "prism-recipe-rules-gate-v1"
 
 
 @dataclass(frozen=True, slots=True)

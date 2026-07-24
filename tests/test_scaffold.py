@@ -74,3 +74,7 @@ def test_missing_openrouter_key_is_structured_fail(monkeypatch: object) -> None:
     meta = result.attestation_metadata()
     assert "llm_gate" in meta
     assert meta["llm_gate"]["rules_digest"] == result.rules_digest
+    assert meta["llm_gate"]["decision"] == "fail"
+    assert meta["llm_gate"]["checked_at"]
+    # prompt_hash may be empty when key missing (no request built).
+    assert "prompt_hash" in meta["llm_gate"]
