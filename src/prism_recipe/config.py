@@ -50,7 +50,7 @@ SMOKE_TOKEN_BUDGET_ENV = "PRISM_RECIPE_TOKEN_BUDGET"
 
 # OpenRouter pre-train rules gate pins (VAL-RECIPE-003 / VAL-RECIPE-004).
 # Model is request-pinned; miners supply OPENROUTER_API_KEY only (never bake keys).
-DEFAULT_OPENROUTER_MODEL = "openai/gpt-4.1-mini"
+DEFAULT_OPENROUTER_MODEL = "x-ai/grok-4.5"
 OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_CHAT_URL = OPENROUTER_API_URL

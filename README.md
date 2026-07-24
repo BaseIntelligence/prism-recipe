@@ -134,7 +134,7 @@ host `LIUM_API_KEY`, master URL, hotkey binding).
 | Epochs / pass | `1` (single-pass; multi-epoch rescan forbidden) |
 | Smoke override | `PRISM_RECIPE_TOKEN_BUDGET` (budget only; offset identity unchanged) |
 | Master FineWeb mount | **Not required** — workers load HF / cached shards themselves |
-| Default OpenRouter model | `openai/gpt-4.1-mini` (pinned request model) |
+| Default OpenRouter model | `x-ai/grok-4.5` (pinned request model) |
 | Rules tree | `.rules/*.md` (immutable in image) |
 | Gate attestation | `rules_digest`, `model`, `decision`, `checked_at`, `prompt_hash` |
 

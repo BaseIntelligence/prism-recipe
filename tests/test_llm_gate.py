@@ -28,6 +28,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RULES_DIR = REPO_ROOT / ".rules"
 
 
+def test_default_openrouter_model_is_grok_45() -> None:
+    """VAL-RECIPE-SYS-001: evaluation/rules-gate default is x-ai/grok-4.5."""
+    assert DEFAULT_OPENROUTER_MODEL == "x-ai/grok-4.5"
+
+
 def _or_response(
     *,
     status_code: int = 200,
