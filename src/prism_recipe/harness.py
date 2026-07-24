@@ -20,6 +20,16 @@ from prism_recipe.llm_gate import GateResult, run_rules_gate
 from prism_recipe.smoke_train import read_sealed_sources, run_smoke_train
 
 
+def _want_gpu_short() -> bool:
+    """True when PRISM_RECIPE_GPU_SHORT=1 (real CUDA ~1M short train score path)."""
+    return os.environ.get("PRISM_RECIPE_GPU_SHORT", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class RunOutcome:
     """Structured harness outcome for worker / attestation surfaces."""
@@ -144,7 +154,7 @@ def run_train(*, smoke: bool | None = None) -> RunOutcome:
             except ValueError:
                 smoke = False
 
-    if smoke:
+    if smoke and not _want_gpu_short():
         result = run_smoke_train()
         meta = dict(result.metadata or {})
         meta.update(
@@ -167,6 +177,38 @@ def run_train(*, smoke: bool | None = None) -> RunOutcome:
             metadata=meta,
         )
 
+    # Real CUDA short train (~1M params, 50k–200k tokens) for live GPU score path.
+    if _want_gpu_short():
+        from prism_recipe.gpu_train import run_gpu_short_train
+
+        result = run_gpu_short_train(require_cuda=True)
+        meta = dict(result.metadata or {})
+        meta.update(
+            {
+                "gpu_short": True,
+                "smoke": False,
+                "param_count": result.param_count,
+                "tokens_consumed": result.tokens_consumed,
+                "tokens_seen": result.tokens_consumed,
+                "steps": result.steps,
+                "final_loss": result.final_loss,
+                "architecture": result.architecture,
+                "device": result.device,
+                "token_budget": result.token_budget,
+                "cuda_name": result.cuda_name,
+                "not_tinylm_fingerprint": True,
+            }
+        )
+        if result.run_manifest is not None:
+            meta["run_manifest"] = result.run_manifest
+        return RunOutcome(
+            ok=result.ok,
+            stage=result.stage,
+            message=result.message,
+            gate=result.gate,
+            metadata=meta,
+        )
+
     # Non-smoke prod train still requires gate; full 2.5B loop is out of scope
     # for this milestone (pin only). Prefer smoke for local / CI proof.
     outcome = preflight(skip_gate=False)
@@ -179,6 +221,9 @@ def run_train(*, smoke: bool | None = None) -> RunOutcome:
         gate=outcome.gate,
         metadata={
             **(outcome.metadata or {}),
-            "hint": "set PRISM_RECIPE_SMOKE=1 for offline tiny-1m smoke train",
+            "hint": (
+                "set PRISM_RECIPE_SMOKE=1 for offline tiny-1m smoke, or "
+                "PRISM_RECIPE_GPU_SHORT=1 for real CUDA short train"
+            ),
         },
     )

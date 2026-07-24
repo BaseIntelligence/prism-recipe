@@ -29,6 +29,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Offline tiny-1m smoke train (fixture data, small budget)",
     )
+    p_train.add_argument(
+        "--gpu-short",
+        action="store_true",
+        help="Real CUDA short train (~1M params, 50k-200k tokens) for score path",
+    )
+    p_gpu = sub.add_parser(
+        "gpu-short",
+        help="Alias for train --gpu-short (real CUDA ~1M short train)",
+    )
+    p_gpu.add_argument(
+        "--token-budget",
+        type=int,
+        default=None,
+        help="Token budget (default 65536; clamp 1024..200000)",
+    )
     p_smoke = sub.add_parser(
         "smoke",
         help="Alias for train --smoke (offline end-to-end tiny-1m)",
@@ -68,11 +83,31 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(outcome.as_dict(), indent=2))
         return 0 if outcome.ok else 2
 
-    if args.command == "train":
-        smoke = bool(getattr(args, "smoke", False))
-        if smoke:
-            import os
+    if args.command == "gpu-short":
+        import os
 
+        os.environ["PRISM_RECIPE_GPU_SHORT"] = "1"
+        # Scoring path: never skip gate unless caller already set env (CI only).
+        budget = getattr(args, "token_budget", None)
+        if budget is not None:
+            os.environ["PRISM_RECIPE_TOKEN_BUDGET"] = str(int(budget))
+        elif not os.environ.get("PRISM_RECIPE_TOKEN_BUDGET"):
+            os.environ["PRISM_RECIPE_TOKEN_BUDGET"] = "65536"
+        outcome = run_train(smoke=False)
+        print(json.dumps(outcome.as_dict(), indent=2))
+        return 0 if outcome.ok else 2
+
+    if args.command == "train":
+        import os
+
+        smoke = bool(getattr(args, "smoke", False))
+        gpu_short = bool(getattr(args, "gpu_short", False))
+        if gpu_short:
+            os.environ["PRISM_RECIPE_GPU_SHORT"] = "1"
+            if not os.environ.get("PRISM_RECIPE_TOKEN_BUDGET"):
+                os.environ["PRISM_RECIPE_TOKEN_BUDGET"] = "65536"
+            smoke = False
+        if smoke:
             os.environ["PRISM_RECIPE_SMOKE"] = "1"
             if not os.environ.get("PRISM_RECIPE_TOKEN_BUDGET"):
                 os.environ["PRISM_RECIPE_TOKEN_BUDGET"] = "256"
