@@ -160,6 +160,18 @@ small `token_budget` (mocked HF fixture). Live dual-Lium score path is a follow-
 Production 2.5B train is a **config pin**, not a required live long GPU run for engineering
 smoke.
 
+## Miner navigation map (BASE recipes)
+
+| Repo | Use when |
+| --- | --- |
+| [prism-recipe](https://github.com/BaseIntelligence/prism-recipe) (this repo) | Mining **PRISM** (digest-pinned train image + Lium / worker-plane GPU attestation) |
+| [agent-recipe](https://github.com/BaseIntelligence/agent-recipe) | Mining **agent-challenge** (agent ZIP + Phala TDX attestation) |
+| [agent-challenge](https://github.com/BaseIntelligence/agent-challenge) | Challenge service, submit scripts, full selfdeploy implementation |
+| [baseagent](https://github.com/BaseIntelligence/baseagent) | Upstream agent template only (sync source for agent-recipe) |
+
+These two recipe repos are the miner day-1 product surfaces: **prism-recipe** for PRISM and
+**agent-recipe** for agent-challenge.
+
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
