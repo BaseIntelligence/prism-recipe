@@ -1,0 +1,64 @@
+{
+  "feature_id": "prism-recipe-image-tiny1m-smoke",
+  "recorded_at_utc": "2026-07-24T04:32:30Z",
+  "assertions": {
+    "VAL-RECIPE-005": {
+      "status": "pass",
+      "notes": "Dockerfile (CPU smoke twin) + Dockerfile.cuda buildable layout; docker build -t prism-recipe:local succeeded; image Id/digest recorded"
+    },
+    "VAL-RECIPE-006": {
+      "status": "pass",
+      "notes": "transformer-tiny-1m (1049216 params ≤1.5M) smoke train under token_budget=256 with fixture HF stream; pytest + in-image smoke ok"
+    }
+  },
+  "image": {
+    "tag": "prism-recipe:local",
+    "image_id": "sha256:8aa0470969a56df2b8a9c8231fa60dd54414e397939a9f9db8d42f3a5e5e6ea3",
+    "repo_digests": [
+      "prism-recipe@sha256:8aa0470969a56df2b8a9c8231fa60dd54414e397939a9f9db8d42f3a5e5e6ea3"
+    ],
+    "variant": "cpu-smoke",
+    "cuda_dockerfile": "Dockerfile.cuda",
+    "size_bytes": 339359153,
+    "labels": {
+      "prism.recipe.architecture": "transformer-tiny-1m",
+      "prism.recipe.mid_run_miner_mutation": "false",
+      "prism.recipe.variant": "cpu-smoke"
+    },
+    "sealed_paths_verified": [
+      "/app/.rules/training.md",
+      "/app/src/prism_recipe/harness.py",
+      "/app/src/prism_recipe/loader.py",
+      "/app/src/prism_recipe/llm_gate.py",
+      "/app/src/prism_recipe/arch/tiny_1m.py"
+    ]
+  },
+  "smoke": {
+    "command": "docker run --rm -e PRISM_RECIPE_SMOKE=1 -e PRISM_RECIPE_SMOKE_SKIP_GATE=1 -e PRISM_RECIPE_TOKEN_BUDGET=256 prism-recipe:local smoke --skip-gate",
+    "ok": true,
+    "param_count": 1049216,
+    "tokens_seen": 256,
+    "steps": 2,
+    "architecture": "transformer-tiny-1m",
+    "device": "cpu",
+    "mid_run_miner_mutation": false
+  },
+  "tests": {
+    "command": "pytest -q",
+    "passed": 40,
+    "failed": 0
+  },
+  "miner_deploy_env_documented": {
+    "container": ["OPENROUTER_API_KEY"],
+    "host_only": ["LIUM_API_KEY"],
+    "master_url": "https://chain.joinbase.ai",
+    "binding": "worker enroll bound to miner SS58 hotkey",
+    "docs": ["docs/miner/README.md", ".env.example", "README.md"]
+  },
+  "evidence_paths": [
+    ".docs-evidence/IMAGE_DIGEST.md",
+    ".docs-evidence/IMAGE_ID.txt",
+    "evidence/prism-recipe-image-tiny1m-smoke/REPORT.json"
+  ],
+  "secrets_printed": false
+}

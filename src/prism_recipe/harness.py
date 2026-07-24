@@ -1,18 +1,23 @@
-"""Recipe harness entrypoints (stubs).
+"""Recipe harness entrypoints.
 
 Product model: architecture + training + train loop live **inside** this
 image. Miners do not submit a separate architecture ZIP for this product path.
 They supply ``OPENROUTER_API_KEY`` and Lium deploy environment only.
+
+There is **no mid-run miner mutation path** — rules, harness, loader, LLM gate,
+and sealed tiny-1m architecture are image-bundled and digest-pinned.
 """
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
 from prism_recipe.config import prod_data_window, resolve_token_budget
 from prism_recipe.loader import build_loader
 from prism_recipe.llm_gate import GateResult, run_rules_gate
+from prism_recipe.smoke_train import read_sealed_sources, run_smoke_train
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +35,7 @@ class RunOutcome:
             "ok": self.ok,
             "stage": self.stage,
             "message": self.message,
+            "mid_run_miner_mutation": False,
         }
         if self.gate is not None:
             payload["gate"] = self.gate.as_dict()
@@ -39,13 +45,11 @@ class RunOutcome:
         return payload
 
 
-def preflight() -> RunOutcome:
-    """Validate env + plans without starting train (stub)."""
+def _base_metadata() -> dict[str, Any]:
     pin = prod_data_window()
     loader = build_loader(pin)
     plan = loader.plan()
-    gate = run_rules_gate()
-    meta = {
+    return {
         "data_window": plan.as_dict(),
         "prod_token_budget_pin": 2_500_000_000,
         "token_budget_prod": 2_500_000_000,
@@ -54,7 +58,54 @@ def preflight() -> RunOutcome:
         "resolved_budget": resolve_token_budget(),
         "master_fineweb_mount_required": False,
         "workers_load_hf_themselves": True,
+        "mid_run_miner_mutation": False,
+        "image_contents": [
+            "rules",
+            "harness",
+            "loader",
+            "llm_gate",
+            "tiny_1m",
+        ],
     }
+
+
+def preflight(*, skip_gate: bool | None = None) -> RunOutcome:
+    """Validate env + data plan + LLM gate without starting train."""
+    meta = _base_metadata()
+    arch_src, train_src = read_sealed_sources()
+    meta["sealed_sources"] = {
+        "architecture_chars": len(arch_src),
+        "training_chars": len(train_src),
+    }
+
+    if skip_gate is None:
+        skip_gate = os.environ.get("PRISM_RECIPE_SMOKE_SKIP_GATE", "").strip() in {
+            "1",
+            "true",
+            "yes",
+        }
+
+    if skip_gate:
+        from datetime import datetime, timezone
+
+        from prism_recipe.llm_gate import rules_digest
+
+        gate = GateResult(
+            ok=True,
+            reason="smoke_skip_gate",
+            rules_digest=rules_digest(),
+            model="smoke-local",
+            checked_at=datetime.now(timezone.utc).isoformat(),
+            decision="pass",
+            prompt_hash="",
+            reason_codes=("smoke_skip_gate",),
+        )
+    else:
+        gate = run_rules_gate(
+            architecture_source=arch_src,
+            training_source=train_src,
+        )
+
     if not gate.ok:
         return RunOutcome(
             ok=False,
@@ -72,21 +123,62 @@ def preflight() -> RunOutcome:
     )
 
 
-def run_train() -> RunOutcome:
+def run_train(*, smoke: bool | None = None) -> RunOutcome:
     """Full train path.
 
-    LLM rules gate **must** run first via preflight. When the gate returns
-    ``ok:false``, train does not start and the structured gate + attestation
-    metadata are returned for the worker result / ExecutionProof path.
+    LLM rules gate **must** run first. When the gate returns ``ok:false``,
+    train does not start and structured gate + attestation metadata are
+    returned for the worker result / ExecutionProof path.
+
+    Smoke mode (default when ``PRISM_RECIPE_SMOKE=1`` or tiny budget env is set
+    without a full train deployment) runs offline tiny-1m steps on a mocked HF
+    fixture under a small ``token_budget``.
     """
-    outcome = preflight()
+    if smoke is None:
+        smoke = os.environ.get("PRISM_RECIPE_SMOKE", "").strip() in {"1", "true", "yes"}
+        # Implicit smoke when callers only set a tiny budget override.
+        if not smoke and os.environ.get("PRISM_RECIPE_TOKEN_BUDGET"):
+            try:
+                if resolve_token_budget() <= 100_000:
+                    smoke = True
+            except ValueError:
+                smoke = False
+
+    if smoke:
+        result = run_smoke_train()
+        meta = dict(result.metadata or {})
+        meta.update(
+            {
+                "smoke": True,
+                "param_count": result.param_count,
+                "tokens_seen": result.tokens_seen,
+                "steps": result.steps,
+                "final_loss": result.final_loss,
+                "architecture": result.architecture,
+                "device": result.device,
+                "token_budget": result.token_budget,
+            }
+        )
+        return RunOutcome(
+            ok=result.ok,
+            stage=result.stage,
+            message=result.message,
+            gate=result.gate,
+            metadata=meta,
+        )
+
+    # Non-smoke prod train still requires gate; full 2.5B loop is out of scope
+    # for this milestone (pin only). Prefer smoke for local / CI proof.
+    outcome = preflight(skip_gate=False)
     if not outcome.ok:
-        # Gate (or earlier stage) blocked train — never start train on reject.
         return outcome
     return RunOutcome(
         ok=False,
         stage="train",
-        message="train_not_implemented",
+        message="prod_train_requires_deployed_worker",
         gate=outcome.gate,
-        metadata=outcome.metadata,
+        metadata={
+            **(outcome.metadata or {}),
+            "hint": "set PRISM_RECIPE_SMOKE=1 for offline tiny-1m smoke train",
+        },
     )

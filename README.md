@@ -103,15 +103,25 @@ prism-recipe preflight
 
 Copy [`.env.example`](.env.example) for local env naming only. Do not commit real keys.
 
-### Docker (placeholder)
+### Docker (CPU smoke twin + CUDA)
 
 ```bash
+# CPU smoke twin (CI / local) — builds, runs offline tiny-1m smoke in-image
 docker build -t prism-recipe:local .
-docker run --rm -e OPENROUTER_API_KEY prism-recipe:local preflight
+docker image inspect prism-recipe:local --format '{{.Id}}' | tee .docs-evidence/IMAGE_ID.txt
+docker run --rm \
+  -e PRISM_RECIPE_SMOKE=1 \
+  -e PRISM_RECIPE_SMOKE_SKIP_GATE=1 \
+  -e PRISM_RECIPE_TOKEN_BUDGET=256 \
+  prism-recipe:local smoke --skip-gate
+
+# CUDA variant (miner GPU hosts)
+docker build -f Dockerfile.cuda -t prism-recipe:cuda .
 ```
 
-Record the image digest after build for miner pin documentation. CUDA train base and tiny-1m
-smoke image complete in follow-on work; this Dockerfile is the sealed entrypoint shape.
+Record the image Id / registry content digest after build for miner pin documentation.
+See [docs/miner/README.md](docs/miner/README.md) for deploy env (`OPENROUTER_API_KEY`,
+host `LIUM_API_KEY`, master URL, hotkey binding).
 
 ## Configuration pins
 
@@ -133,21 +143,22 @@ smoke image complete in follow-on work; this Dockerfile is the sealed entrypoint
 ```text
 prism-recipe/
   .rules/                 # training compliance (LLM gate input)
-  src/prism_recipe/       # package: config, loader, llm_gate, harness, cli
-  tests/                  # unit / scaffold / loader / gate tests
+  src/prism_recipe/       # config, loader, llm_gate, arch/tiny_1m, smoke_train, harness, cli
+  tests/                  # unit + offline + smoke train tests
   docs/                   # miner + architecture + security
-  Dockerfile              # image placeholder (digest pin later)
+  Dockerfile              # CPU smoke twin (digest pin)
+  Dockerfile.cuda         # CUDA miner variant
   pyproject.toml
   LICENSE                 # Apache-2.0
 ```
 
 ## Status
 
-Scaffold plus **egalitarian FineWeb-Edu loader** and **pre-train OpenRouter LLM rules gate**
-(mocked unit tests; structured fail for missing key / reject; attestation metadata on
-worker results). CUDA image, tiny-1m smoke train, and live dual-Lium score path land in
-follow-on commits. Production 2.5B train is a **config pin**, not a required live long GPU
-run for engineering smoke.
+Scaffold + egalitarian FineWeb-Edu loader + OpenRouter LLM rules gate + **digest-pinned
+image** (CPU twin + CUDA Dockerfile) + **transformer-tiny-1m offline smoke train** under
+small `token_budget` (mocked HF fixture). Live dual-Lium score path is a follow-on feature.
+Production 2.5B train is a **config pin**, not a required live long GPU run for engineering
+smoke.
 
 ## License
 

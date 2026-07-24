@@ -1,0 +1,46 @@
+# PRISM recipe image — CUDA miner deploy variant (preferred for live GPU).
+# CPU smoke twin: Dockerfile (CI / local digest without GPU).
+#
+# Build (requires nvidia-docker capable host for runtime CUDA):
+#   docker build -f Dockerfile.cuda -t prism-recipe:cuda .
+#   docker image inspect prism-recipe:cuda --format '{{.Id}}'
+#
+# Same sealed contents as CPU twin: rules + harness + tiny-1m + loader + gate.
+# No mid-run miner mutation path.
+
+ARG CUDA_IMAGE=pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+FROM ${CUDA_IMAGE}
+
+LABEL org.opencontainers.image.title="prism-recipe" \
+      org.opencontainers.image.description="PRISM recipe CUDA harness: egalitarian HF window, OpenRouter gate, tiny-1m" \
+      org.opencontainers.image.source="https://github.com/BaseIntelligence/prism-recipe" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      prism.recipe.variant="cuda" \
+      prism.recipe.architecture="transformer-tiny-1m" \
+      prism.recipe.mid_run_miner_mutation="false"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PRISM_RECIPE_HOME=/app \
+    HF_HUB_DISABLE_TELEMETRY=1
+
+WORKDIR /app
+
+# Base image already has torch+cuda; install recipe package only.
+COPY pyproject.toml README.md LICENSE ./
+COPY src ./src
+COPY .rules ./.rules
+COPY tests ./tests
+COPY docs ./docs
+
+RUN pip install --upgrade pip \
+    && pip install -e ".[dev]" \
+    && test -f /app/.rules/training.md \
+    && test -f /app/src/prism_recipe/harness.py \
+    && test -f /app/src/prism_recipe/arch/tiny_1m.py \
+    && prism-recipe rules-digest
+
+ENTRYPOINT ["prism-recipe"]
+CMD ["preflight"]

@@ -39,8 +39,23 @@ flowchart TB
 | `prism_recipe.config` | Prod pins + smoke budget resolve |
 | `prism_recipe.loader` | Egalitarian FineWeb loader (offset + budget, single-pass) |
 | `prism_recipe.llm_gate` | OpenRouter rules gate + attestation metadata |
-| `prism_recipe.harness` | Preflight / train orchestration stubs |
-| `prism_recipe.cli` | `preflight`, `train`, `rules-digest` |
+| `prism_recipe.arch.tiny_1m` | Sealed transformer-tiny-1m (≤1.5M params) |
+| `prism_recipe.smoke_train` | Offline fixture HF + tiny-1m train steps |
+| `prism_recipe.harness` | Preflight / smoke train / train orchestration |
+| `prism_recipe.cli` | `preflight`, `train`, `smoke`, `rules-digest` |
+
+## Image seal (VAL-RECIPE-005)
+
+| Artifact | Role |
+| --- | --- |
+| `Dockerfile` | CPU smoke twin (CI / local digest pin) |
+| `Dockerfile.cuda` | CUDA preferred base for miner GPU deploys |
+| `.rules/` | Immutable LLM gate input |
+| `src/prism_recipe/**` | Harness, loader, gate, sealed arch |
+
+`mid_run_miner_mutation=false`: miners cannot swap harness/rules/arch at runtime without
+breaking the digest pin. Secrets stay out of layers (`OPENROUTER_API_KEY` at runtime;
+`LIUM_API_KEY` host-only).
 
 ## Data window identity
 
