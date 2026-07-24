@@ -1,0 +1,52 @@
+[project]
+name = "prism-recipe"
+version = "0.1.0"
+description = "PRISM recipe image: egalitarian HF data window, OpenRouter rules gate, and attested training harness"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "BaseIntelligence" },
+]
+dependencies = [
+  "httpx>=0.27",
+  "pydantic>=2.8",
+  "pydantic-settings>=2.4",
+  "huggingface_hub>=0.24",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+train = [
+  "numpy>=1.26",
+  "torch>=2.3",
+  "tiktoken>=0.7",
+]
+dev = [
+  "pytest>=8",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+prism-recipe = "prism_recipe.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prism_recipe"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008"]

@@ -1,0 +1,150 @@
+<div align="center">
+
+# PRISM Recipe
+
+**Image-sealed PRISM training recipe: egalitarian FineWeb-Edu window, OpenRouter rules gate, and attested miner runtime.**
+
+<a href="docs/miner/README.md">Miners</a> ·
+<a href="docs/architecture.md">Architecture</a> ·
+<a href="docs/security.md">Security</a>
+
+[![License](https://img.shields.io/github/license/BaseIntelligence/prism-recipe)](LICENSE)
+[![Bittensor](https://img.shields.io/badge/Bittensor-subnet-black.svg)](https://bittensor.com/)
+[![BASE](https://img.shields.io/badge/BASE-challenge-6f42c1.svg)](https://joinbase.ai)
+[![joinbase](https://img.shields.io/badge/joinbase.ai-mine-0f766e.svg)](https://joinbase.ai)
+[![Master API](https://img.shields.io/badge/chain.joinbase.ai-API-111827.svg)](https://chain.joinbase.ai/health)
+
+</div>
+
+---
+
+## Overview
+
+**prism-recipe** is the miner-deployable runtime for the PRISM recipe product path on
+[BASE](https://joinbase.ai). Architecture, training loop, data loader, rules gate, and
+harness live **inside a digest-pinned container image**. There is **no separate miner ZIP
+submit path** for this product: miners deploy the recipe image and supply environment only
+(`OPENROUTER_API_KEY` plus Lium / Base worker deploy settings).
+
+Every architecture sees the same **egalitarian** FineWeb-Edu token window: fixed dataset
+identity and revision, fixed global token start offset, production
+`token_budget=2_500_000_000`, **single pass** (one epoch). Smoke and CI may shrink budget
+via `PRISM_RECIPE_TOKEN_BUDGET` without changing the offset pin identity.
+
+Before training starts, an **OpenRouter LLM rules gate** checks code against image-bundled
+`.rules/`. The gate decision and `rules_digest` are intended for ExecutionProof /
+worker-result metadata so peers and Prism finalize can audit that the gate ran.
+
+Master coordination remains off the miner GPU path (no master-hosted PRISM GPU eval for this
+product). Scoring and attestation follow the dual-worker peer path on the live worker plane.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  M[Miner Lium deploy] --> I[Digest-pinned recipe image]
+  I --> G[OpenRouter LLM rules gate]
+  G -->|ok| L[Egalitarian FineWeb loader]
+  L --> T[Train loop in image]
+  T --> P[ExecutionProof + result envelope]
+  P --> A[Peer attestor / Prism finalize]
+  G -->|fail| F[Structured fail + attested metadata]
+```
+
+## How it works
+
+1. **Build / pin** the recipe image and record its content digest.
+2. **Deploy** on Lium (or equivalent) with miner hotkey binding and master URL.
+3. **Inject** `OPENROUTER_API_KEY` (and host-side Lium credentials; never bake secrets).
+4. **Preflight** runs the LLM gate against bundled `.rules/` (structured JSON outcome).
+5. **Load** the egalitarian FineWeb-Edu window (fixed offset; prod 2.5B tokens, 1 pass).
+6. **Train** inside the image (architecture + harness sealed; no miner ZIP swap).
+7. **Attest** with full worker envelope (`run_manifest`, proof, gate metadata, image digest).
+8. **Score** via dual miner-bound workers + peer path; public submission reaches a terminal score state.
+
+## Product model (what miners supply)
+
+| Concern | Owner |
+| --- | --- |
+| Architecture + training + harness | **Recipe image** (this repo) |
+| Egalitarian data window pin | **Recipe image** |
+| OpenRouter rules gate + `.rules/` | **Recipe image** |
+| `OPENROUTER_API_KEY` | **Miner env** at deploy time |
+| Lium / worker deploy credentials | **Miner host env** (not in image) |
+| Separate architecture ZIP submit | **Not used** for this product path |
+
+## Documentation
+
+| Audience | Guide | Contents |
+| --- | --- | --- |
+| Miners | [docs/miner/README.md](docs/miner/README.md) | Deploy env, image pin, preflight, attestation notes |
+| Engineers | [docs/architecture.md](docs/architecture.md) | Flows, package layout, pins |
+| Security | [docs/security.md](docs/security.md) | Secrets, residual risk |
+
+## Quick start (local scaffold)
+
+```bash
+# clone
+git clone https://github.com/BaseIntelligence/prism-recipe.git
+cd prism-recipe
+
+# install
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# smoke unit tests (no network required for scaffold)
+pytest -q
+
+# rules digest + structured preflight (fails structured if key missing)
+prism-recipe rules-digest
+prism-recipe preflight
+```
+
+Copy [`.env.example`](.env.example) for local env naming only. Do not commit real keys.
+
+### Docker (placeholder)
+
+```bash
+docker build -t prism-recipe:local .
+docker run --rm -e OPENROUTER_API_KEY prism-recipe:local preflight
+```
+
+Record the image digest after build for miner pin documentation. CUDA train base and tiny-1m
+smoke image complete in follow-on work; this Dockerfile is the sealed entrypoint shape.
+
+## Configuration pins
+
+| Pin | Value |
+| --- | --- |
+| Dataset | `HuggingFaceFW/fineweb-edu` (revision tightened with loader impl) |
+| Global token start offset | `0` (documented; shared by all arches) |
+| Prod `token_budget` | `2_500_000_000` |
+| Epochs / pass | `1` (single-pass) |
+| Smoke override | `PRISM_RECIPE_TOKEN_BUDGET` |
+| Default OpenRouter model | `openai/gpt-4.1-mini` (gate client lands later) |
+| Rules tree | `.rules/*.md` (immutable in image) |
+
+## Repository layout
+
+```text
+prism-recipe/
+  .rules/                 # training compliance (LLM gate input)
+  src/prism_recipe/       # package: config, loader stub, gate stub, harness, cli
+  tests/                  # unit / scaffold tests
+  docs/                   # miner + architecture + security
+  Dockerfile              # image placeholder (digest pin later)
+  pyproject.toml
+  LICENSE                 # Apache-2.0
+```
+
+## Status
+
+Scaffold ships package layout, rules, Dockerfile placeholder, and stub loader / gate APIs.
+Full FineWeb loader, OpenRouter client, CUDA image, and live dual-Lium score path are
+implemented in follow-on commits. Production 2.5B train is a **config pin**, not a required
+live long GPU run for engineering smoke.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).

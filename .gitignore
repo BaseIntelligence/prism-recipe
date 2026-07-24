@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+.cache/
+
+# Local secrets and keys (never commit)
+*.pem
+*.key
+secrets/
+.secrets/
+
+# Docker / local artifacts
+*.log
+.docker-cache/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local documentation evidence (never publish)
+.docs-evidence/
+
+# HF / dataset caches (workers may mount these; do not commit)
+.cache/huggingface/
+data/cache/
