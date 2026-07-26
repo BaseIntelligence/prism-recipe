@@ -55,6 +55,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_digest = sub.add_parser("rules-digest", help="Print SHA-256 of bundled .rules/")
     p_digest.add_argument("--json", action="store_true", help="Emit JSON")
+    p_seal = sub.add_parser(
+        "sealed-manifest",
+        help="Show/verify/bake sealed-surface SHA-256 manifest (harness/rules/data-window)",
+    )
+    p_seal.add_argument(
+        "action",
+        nargs="?",
+        default="show",
+        choices=("show", "verify", "bake"),
+        help="show (default), verify exec⊆sealed, or bake JSON",
+    )
+    p_seal.add_argument(
+        "--out",
+        default=None,
+        help="Output path for bake (default: $PRISM_RECIPE_HOME/sealed_surface_manifest.json)",
+    )
+    p_seal.add_argument("--json", action="store_true", help="Emit JSON (show/verify)")
 
     args = parser.parse_args(argv)
 
@@ -64,6 +81,56 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"rules_digest": digest}))
         else:
             print(digest)
+        return 0
+
+    if args.command == "sealed-manifest":
+        from pathlib import Path
+
+        from prism_recipe.sealed_surface import (
+            assert_variant_execution_sealed,
+            bake_manifest,
+            build_manifest,
+            default_baked_manifest_path,
+            executed_paths_for_variant,
+            load_baked_manifest,
+            sealed_set,
+        )
+
+        action = getattr(args, "action", "show") or "show"
+        if action == "bake":
+            out = Path(args.out) if args.out else default_baked_manifest_path()
+            manifest = bake_manifest(None, out)
+            print(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "path": str(out),
+                        "file_count": len(manifest["files"]),
+                        "cpu_executed": list(executed_paths_for_variant("cpu")),
+                        "cuda_executed": list(executed_paths_for_variant("cuda")),
+                        "has_gpu_train": "src/prism_recipe/gpu_train.py" in manifest["files"],
+                        "has_smoke_train": "src/prism_recipe/smoke_train.py" in manifest["files"],
+                    },
+                    indent=2,
+                )
+            )
+            return 0
+        manifest = load_baked_manifest() or build_manifest()
+        if action == "verify":
+            for variant in ("cpu", "cuda"):
+                assert_variant_execution_sealed(variant, manifest=manifest)
+            payload = {
+                "ok": True,
+                "sealed_count": len(sealed_set(manifest)),
+                "cpu_executed": list(executed_paths_for_variant("cpu")),
+                "cuda_executed": list(executed_paths_for_variant("cuda")),
+                "cpu_subset": True,
+                "cuda_subset": True,
+            }
+            print(json.dumps(payload, indent=2))
+            return 0
+        # show
+        print(json.dumps(manifest, indent=2, sort_keys=True))
         return 0
 
     if args.command == "preflight":

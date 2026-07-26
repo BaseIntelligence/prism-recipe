@@ -28,9 +28,9 @@ from prism_recipe.arch.tiny_1m import (
 ARCH_NAME = "transformer-tiny-1m"
 from prism_recipe.config import resolve_token_budget
 from prism_recipe.llm_gate import GateResult, run_rules_gate
+from prism_recipe.sealed_surface import ensure_execution_sealed, read_sealed_sources
 from prism_recipe.smoke_train import (
     fixture_encode,
-    read_sealed_sources,
     tiny_fixture_documents,
 )
 
@@ -285,7 +285,8 @@ def run_gpu_short_train(
             "yes",
         }
 
-    arch_src, train_src = read_sealed_sources()
+    ensure_execution_sealed(variant="cuda")
+    arch_src, train_src = read_sealed_sources(variant="cuda")
     if gate is None:
         if skip_gate:
             from prism_recipe.llm_gate import rules_digest

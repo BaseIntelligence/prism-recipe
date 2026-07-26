@@ -13,7 +13,6 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from prism_recipe.arch.tiny_1m import (
@@ -25,11 +24,19 @@ from prism_recipe.arch.tiny_1m import (
 from prism_recipe.config import resolve_token_budget
 from prism_recipe.loader import EgalitarianFineWebLoader, TextDocument, build_loader
 from prism_recipe.llm_gate import GateResult, run_rules_gate
+from prism_recipe.sealed_surface import (
+    ensure_execution_sealed,
+    read_sealed_sources,
+    resolve_repo_root,
+    train_module_relative_path,
+)
 
 # Image-bundled sealed architecture / training sources (no miner swap).
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+# Canonical sealing lives in sealed_surface (M19: variant-aware train module).
+
+_REPO_ROOT = resolve_repo_root()
 SEALED_ARCH_PATH = _REPO_ROOT / "src" / "prism_recipe" / "arch" / "tiny_1m.py"
-SEALED_TRAIN_PATH = Path(__file__).resolve()  # this module is the train loop
+SEALED_TRAIN_PATH = _REPO_ROOT / train_module_relative_path("cpu")
 
 DEFAULT_SMOKE_TOKEN_BUDGET = 256
 DEFAULT_SMOKE_SEQ_LEN = 32
@@ -107,13 +114,6 @@ def fixture_encode(text: str, *, vocab_size: int = MODEL_VOCAB_SIZE) -> list[int
             h = (h * 16777619) & 0xFFFFFFFF
         out.append((h % (vocab_size - 1)) + 1)
     return out
-
-
-def read_sealed_sources() -> tuple[str, str]:
-    """Load image-bundled architecture + train source text for the LLM gate."""
-    arch = SEALED_ARCH_PATH.read_text(encoding="utf-8") if SEALED_ARCH_PATH.is_file() else ""
-    train = SEALED_TRAIN_PATH.read_text(encoding="utf-8") if SEALED_TRAIN_PATH.is_file() else ""
-    return arch, train
 
 
 def _next_token_loss(logits, tokens):
@@ -203,7 +203,8 @@ def run_smoke_train(
             "yes",
         }
 
-    arch_src, train_src = read_sealed_sources()
+    ensure_execution_sealed(variant="cpu")
+    arch_src, train_src = read_sealed_sources(variant="cpu")
     if gate is None:
         if skip_gate:
             from prism_recipe.llm_gate import rules_digest
