@@ -225,3 +225,75 @@ def test_plan_documents_no_master_mount() -> None:
     assert meta["token_budget_prod"] == 2_500_000_000
     assert meta["equal_offset"] == EQUAL_OFFSET
     assert meta["single_pass"] is True
+
+
+def test_default_encode_stable_across_pythonhashseed() -> None:
+    """default_encode must not depend on PYTHONHASHSEED (no builtin hash()).
+
+    Given: the same multi-word input string
+    When: encoded in fresh interpreters with PYTHONHASHSEED=0 and =1
+    Then: both processes emit identical token id lists
+    """
+    import json
+    import os
+    import subprocess
+    import sys
+    import textwrap
+
+    probe = textwrap.dedent(
+        """\
+        import json
+        from prism_recipe.loader import default_encode
+        text = "alpha beta gamma hello world prism recipe stable"
+        print(json.dumps(default_encode(text)))
+        """
+    )
+
+    def _encode_under_seed(seed: str) -> list[int]:
+        env = dict(os.environ)
+        env["PYTHONHASHSEED"] = seed
+        # Prefer package on pythonpath from pytest config; keep src fallback.
+        src = str(__import__("pathlib").Path(__file__).resolve().parents[1] / "src")
+        prev = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = src if not prev else f"{src}{os.pathsep}{prev}"
+        completed = subprocess.run(
+            [sys.executable, "-c", probe],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert completed.returncode == 0, completed.stderr
+        return json.loads(completed.stdout)
+
+    ids_seed_0 = _encode_under_seed("0")
+    ids_seed_1 = _encode_under_seed("1")
+    assert ids_seed_0 == ids_seed_1
+    assert len(ids_seed_0) == 8
+    assert all(isinstance(t, int) and t > 0 for t in ids_seed_0)
+
+
+def test_default_encode_matches_fnv1a_smoke_path() -> None:
+    """Synthetic ids follow the same FNV-1a path as smoke_train.fixture_encode."""
+    from prism_recipe.smoke_train import fixture_encode
+
+    text = "alpha beta gamma"
+    # fixture_encode maps into vocab; default_encode uses full 31-bit positive space.
+    # Both must be seed-stable and derived from the same per-word FNV-1a 32-bit hash.
+    ids = default_encode(text)
+    assert ids == default_encode(text)  # pure / repeatable in-process
+    assert len(ids) == 3
+    # Cross-check: fixture_encode uses FNV then % (vocab-1)+1; rebuild FNV here.
+    def _fnv1a_32(word: str) -> int:
+        h = 2166136261
+        for ch in word.encode("utf-8"):
+            h ^= ch
+            h = (h * 16777619) & 0xFFFFFFFF
+        return h
+
+    expected = [(_fnv1a_32(w) % (2**31 - 1)) or 1 for w in text.split()]
+    assert ids == expected
+    # Smoke path still produces positive in-vocab ids for the same words.
+    smoke_ids = fixture_encode(text)
+    assert len(smoke_ids) == 3
+    assert all(1 <= t < 32000 for t in smoke_ids)  # MODEL_VOCAB_SIZE default path
