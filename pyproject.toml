@@ -8,6 +8,9 @@ license = { text = "Apache-2.0" }
 authors = [
   { name = "BaseIntelligence" },
 ]
+# Lower bounds only for local editable dev. Image builds MUST install from
+# hash-locked requirements.lock (and requirements-torch-cpu.lock on CPU) via
+# `pip install --require-hashes` — never `pip install -e` in Dockerfiles.
 dependencies = [
   "httpx>=0.27",
   "pydantic>=2.8",
@@ -32,7 +35,7 @@ dev = [
 prism-recipe = "prism_recipe.cli:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
