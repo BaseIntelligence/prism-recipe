@@ -1,0 +1,70 @@
+# CI reproducibility gate: dual no-cache CPU image build must yield identical
+# content digests. Blocks merges when the image build is non-deterministic.
+#
+# Proven hermetic method (scripts/repro-build-cpu.sh):
+#   docker buildx build --provenance=false --sbom=false
+#   --output type=docker,name=TAG,rewrite-timestamp=true
+#   SOURCE_DATE_EPOCH=1704067200
+#
+# Comparison: image Id and/or rootfs content digest via
+# scripts/rootfs_content_digest.py + scripts/compare_repro_digests.py
+# On DIFF the job fails loudly naming both digests.
+name: Repro image
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_DATE_EPOCH: "1704067200"
+  REPRO_BUILDER: repro-builder
+  REPRO_TAG_A: prism-recipe:repro-a
+  REPRO_TAG_B: prism-recipe:repro-b
+
+jobs:
+  repro-cpu:
+    name: Dual CPU rebuild digest match
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx (docker-container driver)
+        uses: docker/setup-buildx-action@v3
+        with:
+          name: ${{ env.REPRO_BUILDER }}
+          driver: docker-container
+          use: true
+
+      - name: Dual no-cache CPU rebuild + digest compare
+        env:
+          SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
+          REPRO_BUILDER: ${{ env.REPRO_BUILDER }}
+          REPRO_TAG_A: ${{ env.REPRO_TAG_A }}
+          REPRO_TAG_B: ${{ env.REPRO_TAG_B }}
+        run: |
+          set -euo pipefail
+          echo "=== CI repro gate ==="
+          echo "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}"
+          echo "BUILD_METHOD=scripts/repro-build-cpu.sh"
+          echo "FLAGS=buildx --no-cache --provenance=false --sbom=false --output rewrite-timestamp=true"
+          chmod +x scripts/repro-build-cpu.sh scripts/rootfs_content_digest.py scripts/compare_repro_digests.py
+          ./scripts/repro-build-cpu.sh | tee repro-gate.log
+          # Fail closed if RESULT=MATCH is missing (pipefail already covers non-zero).
+          grep -q 'RESULT=MATCH' repro-gate.log
+          echo "=== CI repro gate PASSED ==="
+
+      - name: Upload repro gate log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repro-gate-log
+          path: repro-gate.log
+          if-no-files-found: ignore
