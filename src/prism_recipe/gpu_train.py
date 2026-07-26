@@ -14,9 +14,10 @@ from __future__ import annotations
 import math
 import os
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 from prism_recipe.arch.tiny_1m import (
     MAX_PARAMS,
@@ -24,8 +25,6 @@ from prism_recipe.arch.tiny_1m import (
     build_tiny_1m,
     count_parameters,
 )
-
-ARCH_NAME = "transformer-tiny-1m"
 from prism_recipe.config import resolve_token_budget
 from prism_recipe.llm_gate import GateResult, run_rules_gate
 from prism_recipe.sealed_surface import ensure_execution_sealed, read_sealed_sources
@@ -33,6 +32,8 @@ from prism_recipe.smoke_train import (
     fixture_encode,
     tiny_fixture_documents,
 )
+
+ARCH_NAME = "transformer-tiny-1m"
 
 # Short train defaults (minutes on a single modern GPU; NEVER 10h / 2.5B).
 DEFAULT_GPU_TOKEN_BUDGET = 65_536
@@ -137,9 +138,8 @@ def _expand_fixture_tokens(token_budget: int, *, vocab_size: int = MODEL_VOCAB_S
     return flat[: token_budget + 64]
 
 
-def _next_token_nll(logits, tokens) -> "tuple[Any, float, int]":
+def _next_token_nll(logits, tokens) -> tuple[Any, float, int]:
     """Return (loss_tensor_mean, sum_nll_nats, n_predicted_tokens)."""
-    import torch
     import torch.nn.functional as F
 
     if logits.dim() == 2:
@@ -180,7 +180,9 @@ def build_gpu_run_manifest(
     # Naive learning check: final mean loss below first sample.
     no_learning = bool(losses) and losses[-1] >= losses[0] * 0.999 and len(losses) >= 2
     estimated_flops = (
-        6.0 * float(param_count) * float(tokens_consumed) if param_count and tokens_consumed else None
+        6.0 * float(param_count) * float(tokens_consumed)
+        if param_count and tokens_consumed
+        else None
     )
     return {
         "schema_version": "prism_run_manifest.v2",
@@ -296,7 +298,7 @@ def run_gpu_short_train(
                 reason="smoke_skip_gate",
                 rules_digest=rules_digest(),
                 model="smoke-local",
-                checked_at=datetime.now(timezone.utc).isoformat(),
+                checked_at=datetime.now(UTC).isoformat(),
                 decision="pass",
                 prompt_hash="",
                 reason_codes=("smoke_skip_gate",),

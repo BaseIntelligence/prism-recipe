@@ -88,7 +88,7 @@ def _from_images(text: str) -> list[str]:
 
 @pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=lambda p: p.name)
 def test_from_bases_pinned_by_sha256_digest(dockerfile: Path) -> None:
-    """Given: Dockerfile under test. When: parse FROM lines. Then: each base ends with @sha256:<64 hex>."""
+    """Given Dockerfile under test; each FROM base ends with @sha256:<64 hex>."""
     assert dockerfile.is_file(), f"missing {dockerfile}"
     text = dockerfile.read_text(encoding="utf-8")
     images = _from_images(text)
@@ -112,7 +112,7 @@ def test_no_editable_pip_install_in_image_path(dockerfile: Path) -> None:
 
 
 def test_requirements_lock_exists_with_sha256_hashes() -> None:
-    """Given: hermetic dep policy. When: read requirements.lock. Then: file has --hash=sha256: pins."""
+    """requirements.lock must exist with --hash=sha256: pins."""
     assert LOCKFILE.is_file(), "requirements.lock missing (hash-locked lockfile required)"
     body = LOCKFILE.read_text(encoding="utf-8")
     assert "--hash=sha256:" in body, "requirements.lock must contain --hash=sha256: entries"
@@ -124,7 +124,7 @@ def test_requirements_lock_exists_with_sha256_hashes() -> None:
 
 @pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=lambda p: p.name)
 def test_dockerfile_installs_via_hashed_lockfile(dockerfile: Path) -> None:
-    """Given: Dockerfile install path. When: scan pip install. Then: uses lockfile + require-hashes."""
+    """Dockerfile pip install must use lockfile + --require-hashes."""
     text = dockerfile.read_text(encoding="utf-8")
     joined = text.replace("\\\n", " ")
     assert "requirements.lock" in text, (

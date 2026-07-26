@@ -48,8 +48,8 @@ def build_tiny_1m(
 ):
     """Construct the sealed TinyDecoderLM (requires torch at call time)."""
     import torch
-    from torch import nn
     import torch.nn.functional as F
+    from torch import nn
 
     if seed is not None:
         torch.manual_seed(int(seed))

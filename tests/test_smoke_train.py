@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -70,7 +71,7 @@ def test_smoke_train_offline_e2e() -> None:
 
 
 def test_smoke_train_respects_gate_reject() -> None:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from prism_recipe.llm_gate import GateResult, rules_digest
 
@@ -79,7 +80,7 @@ def test_smoke_train_respects_gate_reject() -> None:
         reason="unit_test_reject",
         rules_digest=rules_digest(),
         model="test",
-        checked_at=datetime.now(timezone.utc).isoformat(),
+        checked_at=datetime.now(UTC).isoformat(),
         decision="fail",
         reason_codes=("unit_test_reject",),
     )
@@ -119,7 +120,10 @@ def test_harness_run_train_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
     assert outcome.gate is not None
 
 
-def test_cli_smoke_skip_gate(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_smoke_skip_gate(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     pytest.importorskip("torch")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     os.environ.pop("OPENROUTER_API_KEY", None)

@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import UTC
 from typing import Any
 
 from prism_recipe.config import prod_data_window, resolve_token_budget
-from prism_recipe.loader import build_loader
 from prism_recipe.llm_gate import GateResult, run_rules_gate
+from prism_recipe.loader import build_loader
 from prism_recipe.sealed_surface import ensure_execution_sealed, read_sealed_sources
 from prism_recipe.smoke_train import run_smoke_train
 
@@ -102,7 +103,7 @@ def preflight(*, skip_gate: bool | None = None) -> RunOutcome:
         }
 
     if skip_gate:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from prism_recipe.llm_gate import rules_digest
 
@@ -111,7 +112,7 @@ def preflight(*, skip_gate: bool | None = None) -> RunOutcome:
             reason="smoke_skip_gate",
             rules_digest=rules_digest(),
             model="smoke-local",
-            checked_at=datetime.now(timezone.utc).isoformat(),
+            checked_at=datetime.now(UTC).isoformat(),
             decision="pass",
             prompt_hash="",
             reason_codes=("smoke_skip_gate",),

@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import UTC
 from typing import Any
 
 from prism_recipe.arch.tiny_1m import (
@@ -22,8 +23,8 @@ from prism_recipe.arch.tiny_1m import (
     count_parameters,
 )
 from prism_recipe.config import resolve_token_budget
-from prism_recipe.loader import EgalitarianFineWebLoader, TextDocument, build_loader
 from prism_recipe.llm_gate import GateResult, run_rules_gate
+from prism_recipe.loader import EgalitarianFineWebLoader, TextDocument, build_loader
 from prism_recipe.sealed_surface import (
     ensure_execution_sealed,
     read_sealed_sources,
@@ -207,15 +208,16 @@ def run_smoke_train(
     arch_src, train_src = read_sealed_sources(variant="cpu")
     if gate is None:
         if skip_gate:
+            from datetime import datetime
+
             from prism_recipe.llm_gate import rules_digest
-            from datetime import datetime, timezone
 
             gate = GateResult(
                 ok=True,
                 reason="smoke_skip_gate",
                 rules_digest=rules_digest(),
                 model="smoke-local",
-                checked_at=datetime.now(timezone.utc).isoformat(),
+                checked_at=datetime.now(UTC).isoformat(),
                 decision="pass",
                 prompt_hash="",
                 reason_codes=("smoke_skip_gate",),

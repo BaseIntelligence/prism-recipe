@@ -72,7 +72,10 @@ def test_empty_digest_is_diff() -> None:
 
 
 def test_cli_exit_codes_match_and_diff() -> None:
-    """Surface: CLI used by repro-build-cpu.sh / CI — exit 0 MATCH, exit 1 DIFF with both digests."""
+    """Surface: CLI used by repro-build-cpu.sh / CI.
+
+    Exit 0 MATCH, exit 1 DIFF with both digests named.
+    """
     img = "sha256:d4b9d860ee56393f63848513d82d871a2b7dcc083fa5a8179446f520df7ba5ea"
     rootfs = "44e3ac3ea276ba39edcd5a4b187b0e508ea4153ec528666a0051cd7d754ed991"
     ok = subprocess.run(
