@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import UTC
 from typing import Any
 
 from prism_recipe.config import prod_data_window, resolve_token_budget
-from prism_recipe.loader import build_loader
 from prism_recipe.llm_gate import GateResult, run_rules_gate
-from prism_recipe.smoke_train import read_sealed_sources, run_smoke_train
+from prism_recipe.loader import build_loader
+from prism_recipe.sealed_surface import ensure_execution_sealed, read_sealed_sources
+from prism_recipe.smoke_train import run_smoke_train
 
 
 def _want_gpu_short() -> bool:
@@ -82,10 +84,15 @@ def _base_metadata() -> dict[str, Any]:
 def preflight(*, skip_gate: bool | None = None) -> RunOutcome:
     """Validate env + data plan + LLM gate without starting train."""
     meta = _base_metadata()
-    arch_src, train_src = read_sealed_sources()
+    variant = ensure_execution_sealed()
+    arch_src, train_src = read_sealed_sources(variant=variant)
     meta["sealed_sources"] = {
         "architecture_chars": len(arch_src),
         "training_chars": len(train_src),
+        "variant": variant,
+        "train_module": (
+            "gpu_train.py" if variant == "cuda" else "smoke_train.py"
+        ),
     }
 
     if skip_gate is None:
@@ -96,7 +103,7 @@ def preflight(*, skip_gate: bool | None = None) -> RunOutcome:
         }
 
     if skip_gate:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from prism_recipe.llm_gate import rules_digest
 
@@ -105,7 +112,7 @@ def preflight(*, skip_gate: bool | None = None) -> RunOutcome:
             reason="smoke_skip_gate",
             rules_digest=rules_digest(),
             model="smoke-local",
-            checked_at=datetime.now(timezone.utc).isoformat(),
+            checked_at=datetime.now(UTC).isoformat(),
             decision="pass",
             prompt_hash="",
             reason_codes=("smoke_skip_gate",),
@@ -144,6 +151,9 @@ def run_train(*, smoke: bool | None = None) -> RunOutcome:
     without a full train deployment) runs offline tiny-1m steps on a mocked HF
     fixture under a small ``token_budget``.
     """
+    # Fail closed if the train module that will run is outside the sealed set (M19).
+    ensure_execution_sealed()
+
     if smoke is None:
         smoke = os.environ.get("PRISM_RECIPE_SMOKE", "").strip() in {"1", "true", "yes"}
         # Implicit smoke when callers only set a tiny budget override.

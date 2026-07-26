@@ -25,7 +25,7 @@ import os
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -159,7 +159,10 @@ def build_gate_messages(
     }
     return [
         {"role": "system", "content": system},
-        {"role": "user", "content": json.dumps(user_payload, sort_keys=True, separators=(",", ":"))},
+        {
+            "role": "user",
+            "content": json.dumps(user_payload, sort_keys=True, separators=(",", ":")),
+        },
     ]
 
 
@@ -174,7 +177,7 @@ def prompt_hash_for_messages(messages: list[dict[str, str]], *, model: str) -> s
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _result(
@@ -488,7 +491,9 @@ def run_rules_gate(
     # Prefer provider-reported model when present (still pin request model).
     returned_model = response_json.get("model")
     attested_model = (
-        str(returned_model).strip() if isinstance(returned_model, str) and returned_model else resolved_model
+        str(returned_model).strip()
+        if isinstance(returned_model, str) and returned_model
+        else resolved_model
     )
 
     content = _extract_assistant_content(response_json)

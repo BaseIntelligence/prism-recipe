@@ -1,15 +1,36 @@
+# syntax=docker/dockerfile:1.7.1@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 # PRISM recipe image — CUDA miner deploy variant (preferred for live GPU).
 # CPU smoke twin: Dockerfile (CI / local digest without GPU).
 #
+# Hermetic + reproducible build notes:
+#   - Base image pinned by sha256 digest (not a floating tag).
+#   - Deps installed from hash-locked requirements.lock (torch comes from base).
+#   - No editable (-e) installs; package installed as a built wheel/sdist.
+#   - SOURCE_DATE_EPOCH fixed; no apt-get in this path.
+#   - Build network denied except pinned registries (docker.io / registry-1.docker.io
+#     and other hosts in prism_recipe.build_context.ALLOWED_BUILD_REGISTRIES).
+#     Orchestrators must not pass arbitrary --build-context registry mirrors.
+#     Miner trees never supply FROM/base image or a Dockerfile (build-prep rejects).
+#   - Miner code (if present) lives only under /app/miner; sealed surfaces COPY after.
+#   - Build with rewrite-timestamp for byte-identical content digests (see Dockerfile).
+#
 # Build (requires nvidia-docker capable host for runtime CUDA):
-#   docker build -f Dockerfile.cuda -t prism-recipe:cuda .
-#   docker image inspect prism-recipe:cuda --format '{{.Id}}'
+#   docker buildx build --load --provenance=false --sbom=false \
+#     --build-arg SOURCE_DATE_EPOCH=1704067200 \
+#     --output 'type=docker,name=prism-recipe:cuda,rewrite-timestamp=true' \
+#     -f Dockerfile.cuda .
 #
 # Same sealed contents as CPU twin: rules + harness + tiny-1m + loader + gate.
 # No mid-run miner mutation path.
 
-ARG CUDA_IMAGE=pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+ARG SOURCE_DATE_EPOCH=1704067200
+# Digest resolved 2026-07-26 via registry-1.docker.io
+# (pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime).
+ARG CUDA_IMAGE=pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime@sha256:ac7c098a81512e719afa5d2d497f812d7db3498f340a4b819c69cb7b3b257126
 FROM ${CUDA_IMAGE}
+
+# Re-declare after FROM so ENV expansion is non-empty (pre-FROM ARG scope ends at FROM).
+ARG SOURCE_DATE_EPOCH=1704067200
 
 LABEL org.opencontainers.image.title="prism-recipe" \
       org.opencontainers.image.description="PRISM recipe CUDA harness: egalitarian HF window, OpenRouter gate, tiny-1m" \
@@ -19,7 +40,12 @@ LABEL org.opencontainers.image.title="prism-recipe" \
       prism.recipe.architecture="transformer-tiny-1m" \
       prism.recipe.mid_run_miner_mutation="false"
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} \
+    TZ=UTC \
+    LC_ALL=C \
+    LANG=C \
+    PYTHONHASHSEED=0 \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -28,19 +54,39 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Base image already has torch+cuda; install recipe package only.
-COPY pyproject.toml README.md LICENSE ./
+# Base image already has torch+cuda; install hash-locked recipe deps only.
+# ORDER IS LOAD-BEARING: miner subtree first, then sealed recipe surfaces.
+COPY requirements.lock pyproject.toml README.md LICENSE ./
+COPY miner ./miner
 COPY src ./src
 COPY .rules ./.rules
 COPY tests ./tests
 COPY docs ./docs
 
-RUN pip install --upgrade pip \
-    && pip install -e ".[dev]" \
+RUN python -m pip install --require-hashes -r requirements.lock \
+    && python -m pip install --no-build-isolation --no-deps . \
     && test -f /app/.rules/training.md \
     && test -f /app/src/prism_recipe/harness.py \
     && test -f /app/src/prism_recipe/arch/tiny_1m.py \
-    && prism-recipe rules-digest
+    && prism-recipe rules-digest \
+    && prism-recipe sealed-manifest bake --out /app/sealed_surface_manifest.json \
+    && test -f /app/sealed_surface_manifest.json \
+    && prism-recipe sealed-manifest verify \
+    && rm -rf /tmp/* /root/.cache /var/tmp/* \
+    && find /usr/local /app -xdev -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
+
+# Mech 6 — build-time per-run attestation secret (BuildKit secret mount).
+# Mount is not stored in the layer; only destination file is. Never ARG/ENV/LABEL.
+# Root miners can extract the key file — raises cost, not trust.
+# PRISM_ATTESTATION_INJECT_ID is NOT the secret — cache bust only.
+ARG PRISM_ATTESTATION_INJECT_ID=unset
+RUN --mount=type=secret,id=attestation_secret,required=true \
+    test -n "${PRISM_ATTESTATION_INJECT_ID}" \
+    && test "${PRISM_ATTESTATION_INJECT_ID}" != "unset" \
+    && mkdir -p /run/prism \
+    && install -m 0400 /run/secrets/attestation_secret /run/prism/attestation_hmac_key \
+    && test -s /run/prism/attestation_hmac_key \
+    && touch -h -d "@${SOURCE_DATE_EPOCH}" /run/prism /run/prism/attestation_hmac_key
 
 ENTRYPOINT ["prism-recipe"]
 CMD ["preflight"]

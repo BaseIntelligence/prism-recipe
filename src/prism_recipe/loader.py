@@ -24,11 +24,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from prism_recipe.config import (
-    DataWindowPin,
     EQUAL_OFFSET,
     PROD_DATASET_ID,
     PROD_DATASET_REVISION,
     TOKEN_BUDGET_PROD,
+    DataWindowPin,
     prod_data_window,
     resolve_token_budget,
 )
@@ -77,18 +77,31 @@ class DocumentSlice:
         return _document_text(self.document)
 
 
+def _fnv1a_32(data: bytes) -> int:
+    """FNV-1a 32-bit (same constants as smoke_train.fixture_encode)."""
+    h = 2166136261
+    for byte in data:
+        h ^= byte
+        h = (h * 16777619) & 0xFFFFFFFF
+    return h
+
+
 def default_encode(text: str) -> list[int]:
     """Offline-safe default: one synthetic token id per whitespace word.
 
     Real train loops should pass a tokenizer encode_fn. Word split keeps unit
     tests deterministic without optional train extras (tiktoken/torch).
+
+    Token ids are derived via FNV-1a (not builtin hash()) so results are stable
+    across PYTHONHASHSEED values — matching the smoke fixture encode path.
     """
     if not text or not text.strip():
         return []
-    # Stable synthetic ids from word hashes (positive 31-bit).
+    # Stable synthetic ids from FNV-1a word hashes (positive 31-bit).
     out: list[int] = []
     for word in text.split():
-        out.append(abs(hash(word)) % (2**31 - 1) or 1)
+        h = _fnv1a_32(word.encode("utf-8"))
+        out.append((h % (2**31 - 1)) or 1)
     return out
 
 
