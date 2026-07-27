@@ -88,5 +88,9 @@ RUN --mount=type=secret,id=attestation_secret,required=true \
     && test -s /run/prism/attestation_hmac_key \
     && touch -h -d "@${SOURCE_DATE_EPOCH}" /run/prism /run/prism/attestation_hmac_key
 
+# Sidecar listen mode (optional). Publish this port in the Lium template's
+# internal_ports so BASE can dial POST /v1/sidecar/attest on the instance.
+EXPOSE 8787
+
 ENTRYPOINT ["prism-recipe"]
 CMD ["preflight"]

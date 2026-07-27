@@ -110,5 +110,9 @@ RUN --mount=type=secret,id=attestation_secret,required=true \
 # Build-time only (BuildKit secret mount → file, not ENV):
 #   attestation_secret → /run/prism/attestation_hmac_key (mode 0400)
 
+# Sidecar listen mode (optional). Publish this port in the Lium template's
+# internal_ports so BASE can dial POST /v1/sidecar/attest on the instance.
+EXPOSE 8787
+
 ENTRYPOINT ["prism-recipe"]
 CMD ["preflight"]
